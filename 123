@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>شراء عملة AXC - بوابة الدفع للاكتتاب</title>
+  <link rel="icon" type="image/png" href="assets/img/all-img/AXC_Coin-removebg-preview.png">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.rtl.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/boxicons@latest/css/boxicons.min.css">
+  <style>
+    body {background: linear-gradient(135deg,#072143 0,#0e2e69 100%); color:#fff; font-family:'Cairo',Tahoma,Arial;}
+    .payment-card {background:rgba(255,255,255,0.04); border-radius:18px; box-shadow:0 8px 24px rgba(80,100,200,0.12); padding:36px 20px;max-width:420px;margin:50px auto 0;}
+    h2 {color:#FFD700; font-weight:bold;}
+    .form-label {font-size:1.05rem;}
+    .form-control, .form-control:focus {background:#fff1; color:#fff;}
+    .btn-primary {background: linear-gradient(90deg,#ffba08,#ffd700); color:#222; border:0; font-weight:bold;}
+    .btn-primary:disabled {opacity:.7;}
+    .token-stats {background:rgba(255,255,255,0.16); border-radius:10px; padding:12px 18px; margin:18px 0;}
+    .token-stats h5, .token-stats span {color:#ffd700;}
+    #statusMsg {margin-top:14px; font-size:1.1rem;}
+    .promo-info {font-size:.97rem; color:#FFD700;}
+    .secure-seal {margin-top: 18px;text-align: center;color: #66f6ff;font-size: 0.92rem;}
+    .secure-seal i {color: #FFD700; font-size: 1.2rem;}
+    .wallet-btn {margin-bottom: 18px;}
+    .input-group-text {background:#ffd700; color:#222; font-weight:bold;}
+    .calc-row {display:flex;justify-content:space-between;font-size:.97rem;}
+    .calc-row.total {font-weight:700; border-top:1px solid #ffd700; margin-top:9px; padding-top:7px;}
+    @media (max-width:600px){.payment-card{padding:16px 3vw; margin:15px 0;}}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="payment-card shadow-lg">
+      <div class="text-center mb-4">
+        <img src="assets/img/all-img/AXC_Coin-removebg-preview.png" alt="AXC" width="90" height="90">
+        <h2 class="mt-2 mb-2">شراء عملة AXC</h2>
+        <div class="token-stats">
+          <div class="row g-2">
+            <div class="col-6">
+              <h5 id="icoPrice">$--</h5>
+              <span>سعر العملة</span>
+            </div>
+            <div class="col-6">
+              <h5 id="soldTokens">--</h5>
+              <span>تم بيعها</span>
+            </div>
+            <div class="col-12 mt-2">
+              <span id="phaseName">--</span> | <span id="phaseProgress">--%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <button id="connectBtn" class="btn btn-primary w-100 wallet-btn"><i class="bx bx-wallet"></i> ربط المحفظة</button>
+      <div class="mb-3">
+        <label class="form-label" for="bnbAmount">المبلغ بالـBNB</label>
+        <div class="input-group">
+          <input type="number" min="0.001" step="0.001" id="bnbAmount" class="form-control" placeholder="0.01 BNB">
+          <span class="input-group-text" id="bnbUsd">$0</span>
+        </div>
+        <small class="text-info" id="bnbBalance">رصيدك: -- BNB</small>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="promo">كود الخصم (اختياري)</label>
+        <input type="text" id="promo" class="form-control" placeholder="ادخل كود برومو إذا توفر">
+        <div class="promo-info" id="promoInfo"></div>
+      </div>
+      <div class="mb-3">
+        <button id="estimateBtn" class="btn btn-warning w-100" type="button">احسب عدد AXC المتوقع</button>
+      </div>
+      <div id="calcResult" style="display:none;">
+        <div class="calc-row"><span>سعر BNB (USD):</span> <span id="bnbUsdNow">$--</span></div>
+        <div class="calc-row"><span>القيمة بالدولار:</span> <span id="usdValue">$--</span></div>
+        <div class="calc-row"><span>الرسوم:</span> <span id="feeValue">$--</span></div>
+        <div class="calc-row total"><span>عدد AXC المتوقع:</span> <span id="axcToReceive">--</span></div>
+      </div>
+      <button id="buyBtn" class="btn btn-primary w-100 mt-3" type="button" disabled>شراء AXC الآن</button>
+      <div id="statusMsg" class="text-center"></div>
+      <div class="secure-seal mt-4"><i class="bx bx-lock"></i> معاملات آمنة عبر شبكة BNB</div>
+      <div class="text-center mt-2"><small>عنوان العقد: <span style="direction:ltr;unicode-bidi:embed;">0x04e29fdB5c455dB1e546b5eb4FA0bB95216978B2</span></small></div>
+    </div>
+  </div>
+  <script>
+    // --- إعدادات العقد الذكي
+    const CONTRACT_ADDRESS = '0x04e29fdB5c455dB1e546b5eb4FA0bB95216978B2';
+    const ABI = [
+      {"inputs":[{"internalType":"string","name":"code","type":"string"}],"name":"buyWithBNB","outputs":[],"stateMutability":"payable","type":"function"},
+      {"inputs":[{"internalType":"uint256","name":"bnbAmount","type":"uint256"}],"name":"calculatePurchase","outputs":[{"components":[{"internalType":"uint256","name":"usdValue","type":"uint256"},{"internalType":"uint256","name":"feeUsd","type":"uint256"},{"internalType":"uint256","name":"feeBnb","type":"uint256"},{"internalType":"uint256","name":"netUsdValue","type":"uint256"},{"internalType":"uint256","name":"tokens","type":"uint256"},{"internalType":"bool","name":"meetsRequirements","type":"bool"}],"internalType":"struct AlphaXCoinUUPS.PurchaseResult","name":"result","type":"tuple"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"getCurrentPhaseInfo","outputs":[{"components":[{"internalType":"uint256","name":"phaseNumber","type":"uint256"},{"internalType":"uint48","name":"endTime","type":"uint48"},{"internalType":"uint256","name":"priceUSD","type":"uint256"},{"internalType":"uint256","name":"cap","type":"uint256"},{"internalType":"uint256","name":"sold","type":"uint256"},{"internalType":"uint256","name":"remaining","type":"uint256"},{"internalType":"bool","name":"isActive","type":"bool"}],"internalType":"struct AlphaXCoinUUPS.PhaseInfo","name":"info","type":"tuple"}],"stateMutability":"view","type":"function"},
+      {"inputs":[],"name":"getBNBUSDPrice","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+      {"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+    ];
+    let provider, signer, contract, user, bnbUsd=0, axcPrice=0, axcDecimals=18;
+
+    // --- دوال مساعدة ---
+    function showMsg(msg,type) {
+      const el = document.getElementById('statusMsg');
+      el.innerHTML = msg;
+      el.className = 'text-center ' + (type||'');
+    }
+    function formatNum(n,dec=2){return Number(n).toLocaleString('en-US',{maximumFractionDigits:dec});}
+    function formatToken(n){return formatNum(Number(n)/1e18,2);}
+    // --- ربط المحفظة
+    async function connectWallet() {
+      try {
+        if (!window.ethereum) { showMsg('يجب تثبيت MetaMask!','text-danger'); return; }
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        user = await signer.getAddress();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        showMsg('تم ربط المحفظة بنجاح!','text-success');
+        document.getElementById('buyBtn').disabled = false;
+        updateWallet();
+      } catch (e) { showMsg('تعذر ربط المحفظة','text-danger'); }
+    }
+    // --- تحديث الرصيد والأسعار
+    async function updateWallet() {
+      if (!signer) return;
+      let bal = await provider.getBalance(user);
+      document.getElementById('bnbBalance').innerText = 'رصيدك: '+formatNum(ethers.utils.formatEther(bal),4)+' BNB';
+    }
+    async function updatePhase() {
+      if (!contract) return;
+      let info = await contract.getCurrentPhaseInfo();
+      axcPrice = Number(info.priceUSD)/1e6;
+      document.getElementById('icoPrice').innerText = '$'+axcPrice;
+      document.getElementById('soldTokens').innerText = formatToken(info.sold);
+      document.getElementById('phaseName').innerText = 'المرحلة '+info.phaseNumber;
+      let prog = 100*Number(info.sold)/Number(info.cap);
+      document.getElementById('phaseProgress').innerText = prog.toFixed(1)+'%';
+    }
+    async function updateBNBUSD() {
+      if (!contract) return;
+      let p = await contract.getBNBUSDPrice();
+      bnbUsd = Number(p)/1e8;
+    }
+    // --- حساب عدد التوكنات المتوقع شراءها
+    async function estimateAxc() {
+      showMsg('', '');
+      document.getElementById('calcResult').style.display = 'none';
+      let bnb = parseFloat(document.getElementById('bnbAmount').value);
+      if (!bnb || bnb<0.001) { showMsg('أدخل قيمة صحيحة بالـBNB','text-danger'); return; }
+      if (!contract) { showMsg('يجب ربط المحفظة أولاً','text-danger'); return; }
+      await updateBNBUSD();
+      let bnbWei = ethers.utils.parseEther(bnb.toString());
+      let res = await contract.calculatePurchase(bnbWei);
+      let usd = Number(res.result.usdValue)/1e6;
+      let fee = Number(res.result.feeUsd)/1e6;
+      let tokens = Number(res.result.tokens)/1e18;
+      document.getElementById('bnbUsd').innerText = '$'+formatNum(bnb*bnbUsd,2);
+      document.getElementById('bnbUsdNow').innerText = '$'+formatNum(bnbUsd,2);
+      document.getElementById('usdValue').innerText = '$'+formatNum(usd,2);
+      document.getElementById('feeValue').innerText = '$'+formatNum(fee,2);
+      document.getElementById('axcToReceive').innerText = formatNum(tokens,2)+' AXC';
+      document.getElementById('calcResult').style.display = 'block';
+      return {usd,fee,tokens};
+    }
+    // --- تنفيذ الشراء
+    async function buyAxc() {
+      showMsg('جاري تنفيذ العملية...','text-info');
+      let bnb = parseFloat(document.getElementById('bnbAmount').value)||0;
+      let code = document.getElementById('promo').value.trim();
+      if (!bnb || bnb<0.001) { showMsg('أدخل قيمة صحيحة بالـBNB','text-danger'); return; }
+      if (!contract || !signer) { showMsg('يجب ربط المحفظة أولاً','text-danger'); return; }
+      try {
+        let tx = await contract.buyWithBNB(code, {value: ethers.utils.parseEther(bnb.toString()), gasLimit: 300000});
+        showMsg('برجاء تأكيد المعاملة من المحفظة','text-info');
+        await tx.wait();
+        showMsg('✅ تم الشراء بنجاح!','text-success');
+        updateWallet();
+        updatePhase();
+      } catch (e) {
+        showMsg('تعذر إتمام الشراء: '+(e.data?.message||e.message),'text-danger');
+      }
+    }
+    // --- التحقق من كود البرومو (عرض فقط، الفحص فعلي يتم عند الشراء)
+    document.getElementById('promo').addEventListener('input',function(){
+      let v = this.value.trim();
+      if (!v) {document.getElementById('promoInfo').innerText='';return;}
+      document.getElementById('promoInfo').innerText='سيتم التحقق من الكود عند الشراء';
+    });
+    // --- زر ربط المحفظة
+    document.getElementById('connectBtn').onclick = async()=>{await connectWallet(); await updatePhase(); await updateBNBUSD();}
+    // --- زر الحساب
+    document.getElementById('estimateBtn').onclick = estimateAxc;
+    // --- زر الشراء
+    document.getElementById('buyBtn').onclick = buyAxc;
+    // --- تحديث تلقائي للأسعار والمرحلة
+    setInterval(updatePhase,60000);
+    setInterval(updateBNBUSD,120000);
+    // --- عرض السعر بالدولار عند كتابة القيمة
+    document.getElementById('bnbAmount').addEventListener('input',()=> {
+      let v = parseFloat(document.getElementById('bnbAmount').value)||0;
+      let usd = v*bnbUsd;
+      document.getElementById('bnbUsd').innerText = '$'+formatNum(usd,2);
+    });
+    // --- تحميل مبدئي
+    window.addEventListener('DOMContentLoaded',async()=>{
+      showMsg('', '');
+      if(window.ethereum){provider=new ethers.providers.Web3Provider(window.ethereum);contract=new ethers.Contract(CONTRACT_ADDRESS, ABI, provider);}
+      await updatePhase(); await updateBNBUSD();
+    });
+  </script>
+</body>
+</html>
